@@ -26,3 +26,4 @@ dbt/dbt_packages/
 
 # Jupyter
 .ipynb_checkpoints/
+.env
