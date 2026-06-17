@@ -44,5 +44,33 @@ def main():
     table = client.get_table(table_ref)
     print(f"Cargadas {table.num_rows} filas → {table_ref}")
 
+    # EPRI
+    epri_schema = [
+        bigquery.SchemaField("state", "STRING"),
+        bigquery.SchemaField("stateid", "STRING"),
+        bigquery.SchemaField("year", "INT64"),
+        bigquery.SchemaField("scenario", "STRING"),
+        bigquery.SchemaField("annual_energy_gwh", "FLOAT64"),
+        bigquery.SchemaField("pct_state_consumed", "FLOAT64"),
+    ]
+
+    epri_job_config = bigquery.LoadJobConfig(
+        schema=epri_schema,
+        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        ignore_unknown_values=True,
+    )
+
+    epri_table_ref = f"{PROJECT_ID}.{DATASET}.epri_datacenter_load"
+    epri_job = client.load_table_from_uri(
+        f"gs://{BUCKET}/epri/epri_datacenter_load.ndjson",
+        epri_table_ref,
+        job_config=epri_job_config
+    )
+    epri_job.result()
+
+    epri_table = client.get_table(epri_table_ref)
+    print(f"Cargadas {epri_table.num_rows} filas → {epri_table_ref}")
+
 if __name__ == "__main__":
     main()

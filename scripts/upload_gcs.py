@@ -16,13 +16,20 @@ def upload_to_gcs(local_path, destination_blob):
     print(f"Subido: {local_path} → gs://{BUCKET_NAME}/{destination_blob}")
 
 def main():
+    # EIA
     files = glob.glob("data/raw/eia/*.json")
     if not files:
         print("No hay archivos en data/raw/eia/")
-        return
     for f in files:
         filename = os.path.basename(f)
         upload_to_gcs(f, f"eia/{filename}")
+
+    # EPRI
+    epri_file = "data/raw/epri/epri_datacenter_load.ndjson"
+    if os.path.exists(epri_file):
+        upload_to_gcs(epri_file, "epri/epri_datacenter_load.ndjson")
+    else:
+        print(f"No encontrado: {epri_file}")
 
 if __name__ == "__main__":
     main()
