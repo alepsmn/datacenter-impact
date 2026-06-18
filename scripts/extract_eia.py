@@ -47,7 +47,8 @@ def main():
 
     output_path = f"{OUTPUT_DIR}/eia_electricity_{datetime.today().strftime('%Y%m%d')}.json"
     with open(output_path, "w") as f:
-        json.dump(all_data, f)
+        for record in all_data:
+            f.write(json.dumps(record) + "\n")
 
     print(f"Done. {len(all_data)} registros → {output_path}")
 

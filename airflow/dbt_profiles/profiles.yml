@@ -1,0 +1,12 @@
+datacenter_impact:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: totemic-life-499613-f2
+      dataset: datacenter_impact
+      location: US
+      keyfile: /opt/airflow/keyfile.json
+      threads: 4
+      timeout_seconds: 300
