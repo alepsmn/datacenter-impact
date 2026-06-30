@@ -1,9 +1,20 @@
-keyfile.json
-*.json
-data/
+# Secrets / credenciales (nunca versionar)
+keyfile*.json
 .env
+
+# Datos crudos (landing local, no versionar)
+data/
+
+# Python
 __pycache__/
 *.pyc
+
+# Entornos virtuales
 dbt-env/
+.venv/
+
+# Logs
 logs/
+
+# Notas de planificación / referencia (solo local)
 mds/

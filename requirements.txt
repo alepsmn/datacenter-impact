@@ -1,0 +1,9 @@
+# Dependencias de los scripts de extracción y carga (scripts/).
+# El proyecto dbt y Airflow gestionan las suyas aparte
+# (ver datacenter_impact/ y airflow/Dockerfile).
+
+requests==2.34.2
+python-dotenv==1.2.2
+google-cloud-bigquery==3.42.0
+google-cloud-storage==3.1.1
+openpyxl==3.1.5
