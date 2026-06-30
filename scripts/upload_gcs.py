@@ -1,35 +1,52 @@
-import os
 import glob
+import logging
+import os
+from pathlib import Path
+
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import storage
-from dotenv import load_dotenv
 
-load_dotenv()
+import config
 
-BUCKET_NAME = "datacenter-impact-raw"
-KEY_FILE = "keyfile.json"
+logger = logging.getLogger(__name__)
 
-def upload_to_gcs(local_path, destination_blob):
-    client = storage.Client.from_service_account_json(KEY_FILE)
+BUCKET_NAME = config.BUCKET
+KEY_FILE = config.KEY_FILE
+
+def upload_to_gcs(client: storage.Client, local_path: str, destination_blob: str) -> None:
     bucket = client.bucket(BUCKET_NAME)
     blob = bucket.blob(destination_blob)
-    blob.upload_from_filename(local_path)
-    print(f"Subido: {local_path} → gs://{BUCKET_NAME}/{destination_blob}")
+    try:
+        blob.upload_from_filename(local_path)
+    except gcp_exceptions.GoogleAPIError:
+        logger.exception("Fallo subiendo %s a gs://%s/%s",
+                         local_path, BUCKET_NAME, destination_blob)
+        raise
+    logger.info("Subido: %s → gs://%s/%s", local_path, BUCKET_NAME, destination_blob)
 
-def main():
+def main() -> None:
+    config.configure_logging()
+    if not Path(KEY_FILE).exists():
+        raise FileNotFoundError(
+            f"No se encuentra la credencial '{KEY_FILE}'. "
+            "Configúrala con GCP_KEYFILE o coloca keyfile.json en la raíz."
+        )
+    client = storage.Client.from_service_account_json(KEY_FILE)
+
     # EIA
-    files = glob.glob("data/raw/eia/*.json")
+    files = glob.glob(str(config.EIA_DIR / "*.json"))
     if not files:
-        print("No hay archivos en data/raw/eia/")
+        logger.warning("No hay archivos en %s/", config.EIA_DIR)
     for f in files:
         filename = os.path.basename(f)
-        upload_to_gcs(f, f"eia/{filename}")
+        upload_to_gcs(client, f, f"eia/{filename}")
 
     # EPRI
-    epri_file = "data/raw/epri/epri_datacenter_load.ndjson"
-    if os.path.exists(epri_file):
-        upload_to_gcs(epri_file, "epri/epri_datacenter_load.ndjson")
+    epri_file = config.EPRI_DIR / "epri_datacenter_load.ndjson"
+    if epri_file.exists():
+        upload_to_gcs(client, str(epri_file), "epri/epri_datacenter_load.ndjson")
     else:
-        print(f"No encontrado: {epri_file}")
+        logger.warning("No encontrado: %s", epri_file)
 
 if __name__ == "__main__":
     main()

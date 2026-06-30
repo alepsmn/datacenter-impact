@@ -1,8 +1,18 @@
 import json
-import openpyxl
-from pathlib import Path
+import logging
+from typing import Any
 
-STATE_TO_ID = {
+import openpyxl
+
+import config
+
+logger = logging.getLogger(__name__)
+
+# Cada escenario: (columna de carga, columna de %, año, etiqueta).
+Scenario = tuple[int, int, int, str]
+EPRIRecord = dict[str, Any]
+
+STATE_TO_ID: dict[str, str] = {
     "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
     "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
     "Florida": "FL", "Georgia": "GA", "Hawaii": "HI", "Idaho": "ID",
@@ -18,7 +28,7 @@ STATE_TO_ID = {
     "Wisconsin": "WI", "Wyoming": "WY"
 }
 
-SCENARIOS = [
+SCENARIOS: list[Scenario] = [
     (1, 2, 2023, "baseline"),
     (3, 4, 2030, "low"),
     (5, 6, 2030, "moderate"),
@@ -26,14 +36,15 @@ SCENARIOS = [
     (9, 10, 2030, "higher"),
 ]
 
-def extract():
-    src = Path("data/raw/epri/EPRI_2024_Projections.xlsx")
-    out = Path("data/raw/epri/epri_datacenter_load.ndjson")
+def extract() -> None:
+    config.configure_logging()
+    src = config.EPRI_DIR / "EPRI_2024_Projections.xlsx"
+    out = config.EPRI_DIR / "epri_datacenter_load.ndjson"
 
     wb = openpyxl.load_workbook(src, read_only=True, data_only=True)
     ws = wb.active
 
-    records = []
+    records: list[EPRIRecord] = []
     for row in ws.iter_rows(min_row=3, values_only=True):
         state = row[0]
         if not state or state not in STATE_TO_ID:
@@ -58,7 +69,7 @@ def extract():
         for r in records:
             f.write(json.dumps(r) + "\n")
 
-    print(f"Extraídos {len(records)} registros → {out}")
+    logger.info("Extraídos %s registros → %s", len(records), out)
 
 if __name__ == "__main__":
     extract()
