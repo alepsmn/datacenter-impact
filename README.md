@@ -95,6 +95,40 @@ y las decisiones están documentadas:
 - **Delta de precio como señal.** La mart calcula el cambio de precio 2022→2023 por sector,
   no solo el nivel, para acercarse a un análisis de impacto en vez de una foto estática.
 
+## Tests
+
+Dos niveles de test, uno por cada tipo de código del pipeline.
+
+**Python (`pytest`)** — 70 tests sobre la lógica de extracción, en `tests/`:
+
+- **`test_extract_epri.py`**
+  - `STATE_TO_ID`: el mapa estado→código es correcto, cubre los 50 estados y
+    respeta el formato (2 letras mayúsculas).
+  - `row_to_records` (transformación pura, extraída de `extract()`): campos del
+    registro, conversión MWh→GWh redondeada y los filtros de negocio (estados
+    fuera del mapa y escenarios sin carga se descartan).
+- **`test_extract_eia.py`**
+  - `fetch_eia` con `requests` **mockeado**: reintenta ante 5xx/429, falla
+    rápido ante un 403 (no reintenta) y agota los reintentos ante fallo
+    persistente — sin tocar la red real.
+  - `fetch_all_pages`: paginación — concatena páginas, avanza el `offset` y
+    **corta exactamente al alcanzar el `total`** (incluido el caso borde
+    off-by-one).
+
+El código se hizo testeable separando la **lógica pura del I/O**:
+`row_to_records` y `fetch_all_pages` no tocan disco ni red, así que se prueban
+sin ficheros ni API real (la red se sustituye con la fixture `monkeypatch`).
+
+**dbt (tests declarativos)** — en `models/staging/schema.yml`: `not_null`,
+`unique` y `accepted_values` sobre claves y categóricas (sectores, escenarios).
+`dbt test` los verifica contra los datos reales en BigQuery.
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest                              # tests Python (rápidos, sin red)
+cd datacenter_impact && dbt test    # tests dbt (requiere BigQuery)
+```
+
 ## Cómo ejecutarlo
 
 **Requisitos:** Docker + Docker Compose, una API key de EIA y un service account de GCP con
@@ -128,6 +162,7 @@ cd datacenter_impact && dbt run && dbt test
 
 ```
 scripts/            extracción y carga (EIA, EPRI, GCS, BigQuery)
+tests/              tests pytest de los scripts de extracción
 datacenter_impact/  proyecto dbt (staging + marts + tests)
 airflow/            Dockerfile, docker-compose y DAG de orquestación
 docs/               notas de diseño y log de troubleshooting
@@ -140,6 +175,8 @@ docs/               notas de diseño y log de troubleshooting
 - **Orquestación** real con Airflow sobre Celery, contenerizado.
 - Integración de fuentes heterogéneas (API REST paginada + Excel) y resolución honesta
   de conflictos de grano y cobertura.
+- **Testing** de la lógica de extracción con `pytest` (mocking de red, casos borde,
+  separación lógica/I/O) además de los tests declarativos de dbt.
 
 ---
 
