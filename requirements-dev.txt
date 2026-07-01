@@ -1,0 +1,7 @@
+# Dependencias de DESARROLLO (no de producción).
+# Se instalan encima de requirements.txt solo para testear/lintar el código.
+# Separarlas mantiene la imagen/entorno de producción sin peso muerto.
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+pytest==9.1.1
