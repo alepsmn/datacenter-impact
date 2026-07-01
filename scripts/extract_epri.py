@@ -36,6 +36,37 @@ SCENARIOS: list[Scenario] = [
     (9, 10, 2030, "higher"),
 ]
 
+def row_to_records(row: tuple[Any, ...]) -> list[EPRIRecord]:
+    """Transforma UNA fila del Excel en sus registros (0 a 5, uno por escenario).
+
+    Lógica pura: datos → datos, sin tocar disco ni red. Por eso es testeable de
+    forma directa (ver tests/test_extract_epri.py). `extract()` la invoca por
+    cada fila; aquí vive todo el criterio de negocio:
+      - descarta filas sin estado o de estados fuera del mapa (totales, notas);
+      - descarta un escenario si su carga viene vacía;
+      - convierte MWh → GWh redondeando a 4 decimales.
+    """
+    state = row[0]
+    if not state or state not in STATE_TO_ID:
+        return []
+    stateid = STATE_TO_ID[state]
+    records: list[EPRIRecord] = []
+    for load_col, pct_col, year, scenario in SCENARIOS:
+        load_mwh = row[load_col]
+        pct = row[pct_col]
+        if load_mwh is None:
+            continue
+        records.append({
+            "state": state,
+            "stateid": stateid,
+            "year": year,
+            "scenario": scenario,
+            "annual_energy_gwh": round(load_mwh / 1000, 4),
+            "pct_state_consumed": pct,
+        })
+    return records
+
+
 def extract() -> None:
     config.configure_logging()
     src = config.EPRI_DIR / "EPRI_2024_Projections.xlsx"
@@ -46,23 +77,7 @@ def extract() -> None:
 
     records: list[EPRIRecord] = []
     for row in ws.iter_rows(min_row=3, values_only=True):
-        state = row[0]
-        if not state or state not in STATE_TO_ID:
-            continue
-        stateid = STATE_TO_ID[state]
-        for load_col, pct_col, year, scenario in SCENARIOS:
-            load_mwh = row[load_col]
-            pct = row[pct_col]
-            if load_mwh is None:
-                continue
-            records.append({
-                "state": state,
-                "stateid": stateid,
-                "year": year,
-                "scenario": scenario,
-                "annual_energy_gwh": round(load_mwh / 1000, 4),
-                "pct_state_consumed": pct,
-            })
+        records.extend(row_to_records(row))
 
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
