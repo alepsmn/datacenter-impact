@@ -110,3 +110,63 @@ def test_fetch_eia_agota_reintentos_y_lanza_runtimeerror(monkeypatch):
         extract_eia.fetch_eia()
 
     assert len(llamadas) == extract_eia.MAX_RETRIES   # lo intentó N veces
+
+
+# =============================================================================
+# fetch_all_pages: la PAGINACIÓN. Aquí NO mockeamos requests, mockeamos nuestra
+# propia fetch_eia: a fetch_all_pages no le importa CÓMO se obtiene una página,
+# solo qué hace con ellas (acumular, avanzar offset, cortar en `total`).
+# =============================================================================
+
+def fake_fetch_factory(paginas, total):
+    """Crea un doble de fetch_eia que sirve `paginas` en orden y reporta `total`.
+
+    Cada llamada devuelve la siguiente página con la forma real de la API:
+    {"response": {"data": [...], "total": N}}. Guardamos los offsets pedidos
+    para poder comprobar que la paginación avanzó de verdad.
+    """
+    offsets_pedidos = []
+    contador = {"n": 0}
+
+    def fake_fetch(offset=0, length=5000):
+        offsets_pedidos.append(offset)
+        pagina = paginas[contador["n"]]
+        contador["n"] += 1
+        return {"response": {"data": pagina, "total": total}}
+
+    return fake_fetch, offsets_pedidos
+
+
+def test_una_sola_pagina_devuelve_todos_los_registros(monkeypatch):
+    # total (3) <= length por defecto (5000): una sola llamada y corta.
+    fake, offsets = fake_fetch_factory(paginas=[["a", "b", "c"]], total=3)
+    monkeypatch.setattr(extract_eia, "fetch_eia", fake)
+
+    registros = extract_eia.fetch_all_pages()
+
+    assert registros == ["a", "b", "c"]
+    assert offsets == [0]                 # una única página, offset 0
+
+
+def test_varias_paginas_se_concatenan_y_avanza_el_offset(monkeypatch):
+    # total=3 con length=2 -> 2 páginas: [a,b] en offset 0, [c] en offset 2.
+    fake, offsets = fake_fetch_factory(paginas=[["a", "b"], ["c"]], total=3)
+    monkeypatch.setattr(extract_eia, "fetch_eia", fake)
+
+    registros = extract_eia.fetch_all_pages(length=2)
+
+    assert registros == ["a", "b", "c"]   # concatenó ambas páginas en orden
+    assert offsets == [0, 2]              # avanzó el offset en `length`
+
+
+def test_corta_justo_cuando_offset_alcanza_el_total(monkeypatch):
+    # Caso borde del `>=`: total=4, length=2 -> offset llega EXACTO a 4 y para.
+    # Si el corte fuese `>` en vez de `>=`, pediría una 3ª página inexistente
+    # (IndexError) -> este test protege esa frontera.
+    fake, offsets = fake_fetch_factory(paginas=[["a", "b"], ["c", "d"]], total=4)
+    monkeypatch.setattr(extract_eia, "fetch_eia", fake)
+
+    registros = extract_eia.fetch_all_pages(length=2)
+
+    assert registros == ["a", "b", "c", "d"]
+    assert offsets == [0, 2]              # 2 páginas exactas, sin pedir una 3ª

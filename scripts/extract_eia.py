@@ -39,7 +39,6 @@ API_KEY = config.EIA_API_KEY
 BASE_URL = config.EIA_BASE_URL
 OUTPUT_DIR = config.EIA_DIR
 
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def fetch_eia(offset: int = 0, length: int = 5000) -> dict[str, Any]:
     params = {
@@ -83,15 +82,16 @@ def fetch_eia(offset: int = 0, length: int = 5000) -> dict[str, Any]:
         f"EIA no respondió tras {MAX_RETRIES} intentos (offset {offset})"
     ) from last_exc
 
-def main() -> None:
-    config.configure_logging()
-    if not API_KEY:
-        raise RuntimeError(
-            "Falta EIA_API_KEY en el entorno (.env). Revisa .env.example."
-        )
+def fetch_all_pages(length: int = 5000) -> list[EIARecord]:
+    """Recorre todas las páginas de la API y devuelve TODOS los registros.
+
+    Aísla la lógica de paginación (avanzar `offset`, cortar al alcanzar el
+    `total` que reporta la API) de la escritura a disco. Al no tocar red ni
+    fichero directamente —solo llama a `fetch_eia`— es testeable mockeando esa
+    llamada (ver tests/test_extract_eia.py).
+    """
     all_data: list[EIARecord] = []
     offset = 0
-    length = 5000
 
     while True:
         logger.info("Fetching offset %s...", offset)
@@ -104,6 +104,18 @@ def main() -> None:
         if offset >= int(total):
             break
 
+    return all_data
+
+
+def main() -> None:
+    config.configure_logging()
+    if not API_KEY:
+        raise RuntimeError(
+            "Falta EIA_API_KEY en el entorno (.env). Revisa .env.example."
+        )
+    all_data = fetch_all_pages()
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"eia_electricity_{datetime.today().strftime('%Y%m%d')}.json"
     with open(output_path, "w") as f:
         for record in all_data:
