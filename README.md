@@ -119,9 +119,15 @@ El código se hizo testeable separando la **lógica pura del I/O**:
 `row_to_records` y `fetch_all_pages` no tocan disco ni red, así que se prueban
 sin ficheros ni API real (la red se sustituye con la fixture `monkeypatch`).
 
-**dbt (tests declarativos)** — en `models/staging/schema.yml`: `not_null`,
-`unique` y `accepted_values` sobre claves y categóricas (sectores, escenarios).
-`dbt test` los verifica contra los datos reales en BigQuery.
+**dbt (tests declarativos)** — verificados por `dbt test` contra los datos
+reales en BigQuery:
+
+- *Genéricos* (en `schema.yml`): `not_null`, `unique` y `accepted_values` sobre
+  claves y categóricas. En **staging** (sectores, escenarios) y en los **marts**
+  (`stateid` único en el mart de impacto; claves y `sector_id` en el de sector).
+- *Singular* (`tests/assert_by_sector_grano_unico.sql`): valida la **clave
+  compuesta** `(stateid, sector_id, year)` del mart por sector, que el test
+  genérico `unique` (de una sola columna) no puede expresar.
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt

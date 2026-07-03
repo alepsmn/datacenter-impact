@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  # Grano: una fila por estado. Cruza precio EIA 2023 con carga EPRI baseline.
+  # La clave (stateid) debe ser única y no nula: si se duplicara, el JOIN de
+  # impacto estaría multiplicando filas y el análisis sería incorrecto.
+  - name: mart_datecenter_price_impact
+    description: >
+      Impacto de la carga de data centers en el precio, a nivel estado (2023).
+      Una fila por estado.
+    columns:
+      - name: stateid
+        description: Clave del mart. Una fila por estado.
+        tests:
+          - not_null
+          - unique
+      - name: annual_energy_gwh
+        description: >
+          Carga anual de data centers (baseline 2023). El INNER JOIN con EPRI
+          garantiza que exista para cada fila del mart.
+        tests:
+          - not_null
+
+  # Grano: una fila por (stateid, sector_id, year). La unicidad de esa clave
+  # COMPUESTA se valida con un test singular (tests/assert_by_sector_grano_unico.sql),
+  # porque el test genérico `unique` solo cubre una columna.
+  - name: mart_electricity_by_sector
+    description: >
+      Métricas agregadas por estado × sector × año. Una fila por combinación.
+    columns:
+      - name: stateid
+        tests:
+          - not_null
+      - name: sector_id
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['RES', 'COM', 'IND']
+      - name: year
+        tests:
+          - not_null
