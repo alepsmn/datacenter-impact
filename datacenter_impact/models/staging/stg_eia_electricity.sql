@@ -1,4 +1,4 @@
-with source as ( --  crea  una tabla temporal con nombre, solo vive durante esa query
+with source as ( 
     select * from {{ source('datacenter_impact', 'eia_electricity') }} --  apunta ala tabl a creuda en BigQuery
 ),
 cleaned as (

@@ -1,0 +1,24 @@
+# Configuración de ruff (linter + formateador de Python).
+# Un linter analiza el código SIN ejecutarlo y avisa de errores reales
+# (imports sin usar, variables indefinidas) y de desviaciones de estilo.
+# En CI corre en cada push: si algo falla, el commit sale en rojo.
+
+target-version = "py312"
+line-length = 100
+
+# Ficheros que ruff no debe mirar: entorno virtual, artefactos de dbt y datos.
+exclude = ["dbt-env", "datacenter_impact/target", "datacenter_impact/dbt_packages", "data"]
+
+[lint]
+# Reglas activas. Cada prefijo es una familia:
+#   E, W  pycodestyle  — estilo base de PEP 8
+#   F     pyflakes     — errores reales (import sin usar, nombre indefinido)
+#   I     isort        — orden y agrupación de imports
+#   UP    pyupgrade    — sintaxis moderna (py3.12) en vez de la antigua
+#   B     bugbear      — trampas conocidas (mutable como default, except amplio)
+select = ["E", "W", "F", "I", "UP", "B"]
+
+[lint.isort]
+# `config` es un módulo local del propio repo (scripts/config.py), no de PyPI.
+# Sin esto, isort lo agruparía con las dependencias externas.
+known-first-party = ["config"]

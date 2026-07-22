@@ -1,0 +1,19 @@
+# Perfil de dbt SOLO para CI (y para validar el proyecto en local sin nube).
+#
+# `dbt parse` compila el manifest —resuelve refs, sources, tests y Jinja— sin
+# abrir conexión al warehouse. Pero dbt exige que exista un perfil con el
+# nombre que declara dbt_project.yml, así que definimos uno mínimo.
+#
+# Usa `method: oauth` a propósito: no requiere keyfile ni secretos. En CI no
+# hay credenciales de GCP y no deben hacer falta — si el pipeline de CI
+# necesitara acceso al warehouse para validar el código, sería un mal diseño.
+datacenter_impact:
+  target: ci
+  outputs:
+    ci:
+      type: bigquery
+      method: oauth
+      project: ci-placeholder
+      dataset: ci_placeholder
+      location: US
+      threads: 1

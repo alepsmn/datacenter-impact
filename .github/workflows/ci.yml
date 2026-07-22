@@ -1,0 +1,109 @@
+# Integración continua: en cada push y cada PR, GitHub ejecuta estas
+# comprobaciones en una máquina limpia. Si algo falla, el commit sale en rojo.
+#
+# El valor no es "correr los tests" (eso ya lo haces en local), sino hacerlo en
+# un entorno recién creado desde requirements.txt: eso demuestra que el repo es
+# reproducible y no depende de nada instalado a mano en tu máquina.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Si empujas dos veces seguidas, cancela la ejecución anterior en vez de
+# gastar minutos validando un commit ya superado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12" # misma que la imagen de Airflow (apache/airflow:2.9.2-python3.12)
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Lint: analiza el código sin ejecutarlo (imports sin usar, estilo, errores
+  #    tipográficos que no se ven hasta runtime). Es el job más rápido y el que
+  #    más ruido evita en las revisiones.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar ruff
+        run: pip install -r requirements-dev.txt
+
+      # `--output-format=github` hace que los fallos aparezcan anotados sobre
+      # la línea exacta en la pestaña "Files changed" del PR.
+      - name: ruff check
+        run: ruff check --output-format=github .
+
+      # Nota: NO se fuerza `ruff format`. El formateo automático colapsaría
+      # tablas alineadas a mano que se leen mejor así (p. ej. STATE_TO_ID en
+      # extract_epri.py). El linter cubre lo que importa: errores reales.
+
+  # ---------------------------------------------------------------------------
+  # 2. Tests Python: la suite de pytest. No toca red ni GCP — la API de EIA está
+  #    mockeada — así que corre sin secretos y en segundos.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: pytest
+        run: pytest -v
+
+  # ---------------------------------------------------------------------------
+  # 3. dbt: valida el proyecto de datos. `dbt parse` construye el manifest —
+  #    resuelve refs, sources, tests y todo el Jinja— y falla si hay un `ref` a
+  #    un modelo inexistente, un YAML mal formado o un test mal declarado.
+  #
+  #    Por qué `parse` y no `compile`/`run`: compile y run necesitan conexión al
+  #    warehouse. En CI no hay (ni debe haber) credenciales de BigQuery, así que
+  #    validamos todo lo validable sin nube. Los tests contra datos reales los
+  #    ejecuta el DAG (tarea `dbt_test`), que es donde tiene sentido.
+  # ---------------------------------------------------------------------------
+  dbt:
+    name: dbt (parse)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: datacenter_impact
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Instalar dbt
+        run: pip install -r ../requirements-dev.txt
+
+      # ci/profiles.yml define un perfil sin credenciales (method: oauth).
+      # `--warn-error` convierte cualquier warning de dbt (deprecaciones,
+      # modelos sin documentar) en fallo: mantiene el proyecto limpio.
+      - name: dbt parse
+        run: dbt parse --profiles-dir ../ci --target ci --warn-error
+
+      - name: Listar modelos y tests registrados
+        run: dbt ls --profiles-dir ../ci --target ci

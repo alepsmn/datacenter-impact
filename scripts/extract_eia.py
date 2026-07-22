@@ -1,9 +1,10 @@
 import json
 import logging
 import time
-import requests
 from datetime import datetime
 from typing import Any, TypedDict
+
+import requests
 
 import config
 
@@ -46,8 +47,8 @@ def fetch_eia(offset: int = 0, length: int = 5000) -> dict[str, Any]:
         "frequency": "monthly",
         "data[]": ["price", "sales", "revenue", "customers"],
         "facets[sectorid][]": ["RES", "COM", "IND"],
-        "start": "2015-01",
-        "end": "2024-12",
+        "start": config.EIA_START,
+        "end": config.EIA_END,
         "sort[0][column]": "period",
         "sort[0][direction]": "asc",
         "offset": offset,
@@ -113,6 +114,7 @@ def main() -> None:
         raise RuntimeError(
             "Falta EIA_API_KEY en el entorno (.env). Revisa .env.example."
         )
+    logger.info("Ventana de extracción: %s → %s", config.EIA_START, config.EIA_END)
     all_data = fetch_all_pages()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

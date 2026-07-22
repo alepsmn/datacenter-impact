@@ -32,6 +32,13 @@ EPRI_DIR: Path = DATA_DIR / "epri"
 # --- EIA API ---
 EIA_BASE_URL: str = "https://api.eia.gov/v2/electricity/retail-sales/data/"
 
+# Ventana temporal de la extracción (formato YYYY-MM que espera la API).
+# Parametrizada por entorno para que la orqueta de Airflow pueda pedir otra
+# ventana sin tocar el código: el DAG las inyecta como env vars desde sus
+# `params`. Los valores por defecto son el rango completo del análisis.
+EIA_START: str = os.getenv("EIA_START", "2015-01")
+EIA_END: str = os.getenv("EIA_END", "2024-12")
+
 
 def configure_logging(level: int = logging.INFO) -> None:
     """Configura el logging raíz con timestamps y nivel.

@@ -23,14 +23,13 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "dbt_packages"
 
 
-# Configuring models
-# Full documentation: https://docs.getdbt.com/docs/configuring-models
-
-# In this example config, we tell dbt to build all models in the example/
-# directory as views. These settings can be overridden in the individual model
-# files using the `{{ config(...) }}` macro.
+# Materialización por capa:
+#   staging → vistas (baratas, siempre frescas, son solo limpieza y tipado)
+#   marts   → tablas (se consultan desde BI; materializarlas evita recalcular
+#             las agregaciones y los JOINs en cada consulta)
 models:
   datacenter_impact:
-    # Config indicated by + and applies to all files under models/example/
-    example:
+    staging:
       +materialized: view
+    marts:
+      +materialized: table

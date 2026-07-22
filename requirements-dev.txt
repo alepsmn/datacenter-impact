@@ -5,3 +5,9 @@
 #   pip install -r requirements.txt -r requirements-dev.txt
 
 pytest==9.1.1
+ruff==0.15.22
+
+# dbt para validar el proyecto de datos en CI (`dbt parse`, sin warehouse).
+# Misma versión que instala airflow/Dockerfile: si divergen, CI estaría
+# validando un dbt distinto del que ejecuta el pipeline.
+dbt-bigquery==1.11.1

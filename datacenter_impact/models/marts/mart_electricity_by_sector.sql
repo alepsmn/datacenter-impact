@@ -12,4 +12,4 @@ select
     sum(revenue)    as total_revenue,
     avg(customers)  as avg_customers
 from stg
-group by 1, 2, 3, 4, 5
+group by 1, 2, 3, 4, 5 -- referencias a las columas/atajos posicionales

@@ -11,14 +11,14 @@ models:
     columns:
       - name: stateid
         description: Clave del mart. Una fila por estado.
-        tests:
+        data_tests:
           - not_null
           - unique
       - name: annual_energy_gwh
         description: >
           Carga anual de data centers (baseline 2023). El INNER JOIN con EPRI
           garantiza que exista para cada fila del mart.
-        tests:
+        data_tests:
           - not_null
 
   # Grano: una fila por (stateid, sector_id, year). La unicidad de esa clave
@@ -29,13 +29,14 @@ models:
       Métricas agregadas por estado × sector × año. Una fila por combinación.
     columns:
       - name: stateid
-        tests:
+        data_tests:
           - not_null
       - name: sector_id
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
-              values: ['RES', 'COM', 'IND']
+              arguments:
+                values: ['RES', 'COM', 'IND']
       - name: year
-        tests:
+        data_tests:
           - not_null

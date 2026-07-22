@@ -1,5 +1,7 @@
 # datacenter-impact
 
+[![CI](https://github.com/alepsmn/datacenter-impact/actions/workflows/ci.yml/badge.svg)](https://github.com/alepsmn/datacenter-impact/actions/workflows/ci.yml)
+
 **Pipeline ELT que cuantifica la relación entre la carga eléctrica proyectada de los
 data centers y el precio de la electricidad en EEUU, a nivel estado.**
 
@@ -135,6 +137,48 @@ pytest                              # tests Python (rápidos, sin red)
 cd datacenter_impact && dbt test    # tests dbt (requiere BigQuery)
 ```
 
+## CI
+
+Cada push y cada PR sobre `main` ejecuta [tres jobs](.github/workflows/ci.yml)
+en un entorno limpio, construido desde `requirements.txt` — que es lo que
+demuestra que el repo es reproducible, no solo que los tests pasan:
+
+| Job | Comando | Qué valida |
+|-----|---------|------------|
+| **lint** | `ruff check` | errores reales (imports sin usar, nombres indefinidos) y estilo |
+| **test** | `pytest` | los 70 tests Python — sin red ni credenciales, la API está mockeada |
+| **dbt** | `dbt parse --warn-error` | refs, sources, YAML y tests del proyecto dbt, **sin conectar** al warehouse |
+
+`dbt parse` en vez de `dbt run` a propósito: compilar el manifest no necesita
+BigQuery, así que CI valida el proyecto de datos sin que haya que meter una
+service account en los secretos de GitHub. Los tests contra datos reales los
+ejecuta el DAG (`dbt_test`). Detalles y decisiones: [`docs/CI-Y-ORQUESTACION.md`](docs/CI-Y-ORQUESTACION.md).
+
+Opcionalmente, `pre-commit install` corre el mismo lint antes de cada commit.
+
+## Orquestación
+
+El DAG `datacenter_pipeline` (Airflow sobre Celery, contenerizado) encadena
+`[extract_eia, extract_epri] → upload_gcs → load_bigquery → dbt run → dbt test`.
+
+- **Idempotente de punta a punta.** Cada etapa sobrescribe en vez de acumular
+  (ficheros con `open(..., "w")`, blobs de GCS reemplazados, `WRITE_TRUNCATE` en
+  BigQuery, modelos dbt reconstruidos). Esa propiedad es lo que permite
+  reintentar sin duplicar datos.
+- **Reintentos en dos niveles.** Backoff exponencial *dentro* de `extract_eia`
+  para el hipo de la API (429/5xx), y `retries: 2` a nivel de tarea para lo que
+  mata al script (worker reiniciado, credencial expirada). Más
+  `execution_timeout` y `max_active_runs: 1`.
+- **Ventana temporal parametrizada.** El rango de EIA ya no está hardcodeado:
+  viaja de los `params` del DAG → variables de entorno → `config.py`. Se lanza
+  otra ventana desde la UI sin tocar código.
+- **`BashOperator` a propósito**, no por defecto: aísla cada etapa en su propio
+  proceso en lugar de importarla dentro del worker de Airflow.
+
+El razonamiento completo (incluida la ruta para sustituir el `keyfile.json`
+montado por credenciales efímeras) está en
+[`docs/CI-Y-ORQUESTACION.md`](docs/CI-Y-ORQUESTACION.md).
+
 ## Cómo ejecutarlo
 
 **Requisitos:** Docker + Docker Compose, una API key de EIA y un service account de GCP con
@@ -171,18 +215,25 @@ scripts/            extracción y carga (EIA, EPRI, GCS, BigQuery)
 tests/              tests pytest de los scripts de extracción
 datacenter_impact/  proyecto dbt (staging + marts + tests)
 airflow/            Dockerfile, docker-compose y DAG de orquestación
+ci/                 perfil de dbt sin credenciales, para validar en CI
 docs/               notas de diseño y log de troubleshooting
+.github/workflows/  CI (lint · pytest · dbt parse)
 ```
 
 ## Qué demuestra técnicamente
 
 - Diseño de un pipeline **ELT** completo sobre infraestructura cloud (GCS + BigQuery).
 - Modelado analítico con **dbt** (capas staging/marts, tests, fuentes).
-- **Orquestación** real con Airflow sobre Celery, contenerizado.
+- **Orquestación** real con Airflow sobre Celery, contenerizado, con idempotencia y
+  reintentos razonados en vez de asumidos.
 - Integración de fuentes heterogéneas (API REST paginada + Excel) y resolución honesta
   de conflictos de grano y cobertura.
 - **Testing** de la lógica de extracción con `pytest` (mocking de red, casos borde,
   separación lógica/I/O) además de los tests declarativos de dbt.
+- **CI** en GitHub Actions: lint, tests y validación del proyecto dbt en cada push,
+  sobre un entorno reconstruido desde cero.
+- Código de producción, no de notebook: `logging`, type hints, `TypedDict` como
+  contrato de esquema, configuración centralizada y errores manejados explícitamente.
 
 ---
 

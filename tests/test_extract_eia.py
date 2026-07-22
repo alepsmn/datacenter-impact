@@ -6,10 +6,9 @@ voluntad). La técnica: sustituir requests.get por una función falsa que
 controlamos, usando la fixture `monkeypatch` de pytest.
 """
 
+import extract_eia
 import pytest
 import requests
-
-import extract_eia
 
 
 class FakeResponse:

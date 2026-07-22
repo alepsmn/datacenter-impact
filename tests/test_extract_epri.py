@@ -5,9 +5,8 @@ STATE_TO_ID, que es dato puro (no toca red ni ficheros). Así aislamos los
 mecanismos de pytest sin mezclarlos con conceptos avanzados (mocks, I/O).
 """
 
+import extract_epri
 import pytest
-import extract_epri 
-
 
 # def test_texas_mapea_a_tx():
 #     Arrange: la entrada es una clave conocida del diccionario.
@@ -72,7 +71,8 @@ def test_codigo_es_dos_letras_mayusculas(estado, codigo):
 
     # para verificar que todos esten bien el bucle valdria, este otro metodo permite filtrar
 
-# Si quisiera correr solo el de Texas: python -m pytest -v **-k** "Texas"  -> -k es el parametro para seleccionar
+# Si quisiera correr solo el de Texas: python -m pytest -v **-k** "Texas"
+#   -> -k es el parametro para seleccionar
 
 
 # =============================================================================
@@ -96,7 +96,7 @@ def make_row(estado, pares):
     return tuple(row)
 
 
-# Fila "completa" reutilizable: los 5 escenarios con carga y % 
+# Fila "completa" reutilizable: los 5 escenarios con carga y %
 # Su unico riesgo es si fuese mutable - copia fresca necesaria, pero es solo lectura
 PARES_COMPLETOS = [
     (5000, 1.5),   # baseline 2023

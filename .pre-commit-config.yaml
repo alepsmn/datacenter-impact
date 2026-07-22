@@ -1,0 +1,26 @@
+# Hooks que se ejecutan ANTES de crear un commit (git commit los dispara).
+# Es el CI adelantado a tu máquina: cazas el fallo en 1 segundo en local en vez
+# de esperar 40 en GitHub. Las mismas reglas, el mismo ruff que usa el workflow.
+#
+# Instalación (una vez por clon):
+#   pip install pre-commit && pre-commit install
+#
+# Ejecutar a mano sobre todo el repo:
+#   pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.22 # mantener sincronizado con requirements-dev.txt
+    hooks:
+      - id: ruff # lint (el formateador no se usa: ver .github/workflows/ci.yml)
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml # YAML mal formado (schema.yml de dbt, docker-compose)
+        exclude: ^datacenter_impact/models/ # dbt permite Jinja dentro del YAML
+      - id: check-added-large-files # evita subir un .xlsx o un dump por error
+      - id: detect-private-key # red de seguridad contra subir credenciales

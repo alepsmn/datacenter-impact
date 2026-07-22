@@ -1,33 +1,49 @@
 version: 2
 
+# Nota de sintaxis (dbt >= 1.8): los tests se declaran bajo `data_tests` y los
+# argumentos de un test genérico van anidados en `arguments`. La forma antigua
+# (`tests:` con los argumentos al nivel superior) sigue funcionando pero está
+# deprecada — dbt 1.11 avisa en cada `parse`.
+
 models:
   - name: stg_eia_electricity
+    description: >
+      EIA retail-sales limpio y tipado: `period` desglosado en year/month,
+      columnas renombradas a snake_case y filas sin precio descartadas.
     columns:
       - name: period
-        tests:
+        data_tests:
           - not_null
       - name: stateid
-        tests:
+        data_tests:
           - not_null
       - name: sector_id
-        tests:
+        description: Sector de consumo. Solo residencial, comercial e industrial.
+        data_tests:
           - not_null
           - accepted_values:
-              values: ['RES', 'COM', 'IND']
-  
+              arguments:
+                values: ['RES', 'COM', 'IND']
+
   - name: stg_epri_datacenter_load
+    description: >
+      Proyecciones EPRI de carga de data centers, por estado y escenario.
     columns:
       - name: stateid
-        tests:
+        data_tests:
           - not_null
       - name: year
-        tests:
+        data_tests:
           - not_null
       - name: scenario
-        tests:
+        description: >
+          Escenario de proyección. `baseline` es 2023 (dato observado); el
+          resto son proyecciones a 2030.
+        data_tests:
           - not_null
           - accepted_values:
-              values: ['baseline', 'low', 'moderate', 'high', 'higher']
+              arguments:
+                values: ['baseline', 'low', 'moderate', 'high', 'higher']
       - name: annual_energy_gwh
-        tests:
+        data_tests:
           - not_null
