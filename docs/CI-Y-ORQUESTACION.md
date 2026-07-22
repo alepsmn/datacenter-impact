@@ -188,6 +188,55 @@ sitio, no en cuatro scripts.
 
 ---
 
+---
+
+## Capa de análisis — las figuras
+
+`analysis/plot_impact.py` cierra el diagrama de arquitectura: consulta la mart y
+genera las tres figuras del README. Decisiones que merecen explicación:
+
+**La forma antes que el color.** Cada figura tiene un trabajo distinto y por eso
+usa una forma distinta:
+
+| Figura | Trabajo del lector | Forma | Color |
+|--------|--------------------|-------|-------|
+| `scatter_pct_vs_price` | ¿hay relación? | dispersión en múltiplos pequeños, un panel por sector | un solo hue |
+| `top_states` | ¿quién concentra la carga? | barra horizontal ordenada | secuencial (más oscuro = más alto) |
+| `correlations` | ¿sube o baja? | barra divergente centrada en 0 | divergente azul↔rojo |
+
+Los tres sectores van en **paneles separados**, no superpuestos: sus escalas de
+precio son distintas y solaparlos exigiría un doble eje, que es la peor decisión
+posible en un gráfico — dos escalas verticales permiten "demostrar" cualquier
+correlación con solo elegir los rangos.
+
+**Etiquetas selectivas.** En la dispersión solo se etiquetan los tres estados
+que cuentan la historia (VA, ND, NE), no los 44. Un número sobre cada punto
+convierte el gráfico en una tabla mal maquetada.
+
+**Dos temas, no una inversión.** Cada figura se genera clara y oscura, y el
+README las sirve con `<picture media="(prefers-color-scheme: dark)">`. La
+versión oscura usa **sus propios pasos** de la misma rampa (`analysis/theme.py`),
+elegidos para esa superficie: invertir los colores del tema claro daría un azul
+que vibra sobre negro.
+
+**El título dice el hallazgo, no la variable.** "Más data centers no significa
+luz más cara" en vez de "Precio vs % de consumo". Si el lector solo lee el
+titular, debe llevarse la conclusión correcta.
+
+**Honestidad estadística en el propio gráfico.** El pie de la figura de
+correlaciones dice que con n = 44 y |r| < 0,35 nada es concluyente. Es más fácil
+inflar un hallazgo que anotarlo, y la anotación es lo que distingue un análisis
+de un argumento.
+
+**Qué se testea del análisis.** La estadística (`pearson`, `trend_line`,
+`correlations`, `top_states`), no el dibujo: comparar PNGs píxel a píxel es
+frágil —cambia con la versión de matplotlib o la fuente del sistema— y no
+cazaría ningún error real. Detalle que sí importa: `pearson` **lanza error** si
+una serie es constante, en vez de devolver 0. Una correlación indefinida
+presentada como "0" sería una mentira en el gráfico.
+
+---
+
 ## Limpieza incluida
 
 - Borrado `models/example/` — los modelos de juguete que crea `dbt init` y nunca

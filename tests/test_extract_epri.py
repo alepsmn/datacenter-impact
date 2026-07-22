@@ -5,8 +5,9 @@ STATE_TO_ID, que es dato puro (no toca red ni ficheros). Así aislamos los
 mecanismos de pytest sin mezclarlos con conceptos avanzados (mocks, I/O).
 """
 
-import extract_epri
 import pytest
+
+import extract_epri
 
 # def test_texas_mapea_a_tx():
 #     Arrange: la entrada es una clave conocida del diccionario.

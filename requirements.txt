@@ -1,5 +1,5 @@
-# Dependencias de los scripts de extracción y carga (scripts/).
-# El proyecto dbt y Airflow gestionan las suyas aparte
+# Dependencias de los scripts de extracción y carga (scripts/) y de la capa de
+# análisis (analysis/). El proyecto dbt y Airflow gestionan las suyas aparte
 # (ver datacenter_impact/ y airflow/Dockerfile).
 
 requests==2.34.2
@@ -7,3 +7,6 @@ python-dotenv==1.2.2
 google-cloud-bigquery==3.42.0
 google-cloud-storage==3.1.1
 openpyxl==3.1.5
+
+# Capa de análisis: genera las figuras del README desde la mart.
+matplotlib==3.11.1

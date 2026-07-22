@@ -19,6 +19,6 @@ exclude = ["dbt-env", "datacenter_impact/target", "datacenter_impact/dbt_package
 select = ["E", "W", "F", "I", "UP", "B"]
 
 [lint.isort]
-# `config` es un módulo local del propio repo (scripts/config.py), no de PyPI.
-# Sin esto, isort lo agruparía con las dependencias externas.
-known-first-party = ["config"]
+# Módulos locales del propio repo, no paquetes de PyPI: se importan por ruta
+# (ver pytest.ini). Sin esto, isort los agruparía con las dependencias externas.
+known-first-party = ["config", "theme", "plot_impact", "extract_eia", "extract_epri"]

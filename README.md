@@ -20,6 +20,47 @@ pregunta de negocio: **¿se traduce esa carga adicional en precios más altos pa
 consumidor, y dónde?** Este proyecto construye la base de datos analítica para responderla,
 cruzando dos fuentes que no hablan el mismo idioma (granos, años y cobertura distintos).
 
+## Hallazgos
+
+La respuesta corta a la pregunta de negocio es **no**, y el "no" es más
+interesante que un "sí".
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="analysis/figures/scatter_pct_vs_price-dark.png">
+  <img alt="Dispersión por sector: a mayor penetración de data centers, precios ligeramente más bajos. r = -0.29 residencial, -0.34 comercial, -0.19 industrial." src="analysis/figures/scatter_pct_vs_price.png">
+</picture>
+
+En los 44 estados con dato en ambas fuentes, la penetración de data centers
+correlaciona **negativamente** con el precio de la electricidad en los tres
+sectores. La lectura honesta no es "los data centers abaratan la luz", sino
+**causalidad inversa**: los data centers se instalan donde la electricidad *ya*
+era barata. Virginia, Dakota del Norte, Iowa, Oregón y Wyoming —los cinco
+primeros del ranking— son estados de generación barata (hidráulica, eólica,
+nuclear) y suelo abundante.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="analysis/figures/top_states-dark.png">
+  <img alt="Ranking de estados: Virginia 25,6%, Dakota del Norte 15,4%, Nebraska 11,7%, Iowa 11,4%, Oregón 11,4%." src="analysis/figures/top_states.png">
+</picture>
+
+Virginia es el caso extremo: **25,6% de todo su consumo eléctrico** va a data
+centers, 10 puntos por encima del segundo. Es el "Data Center Alley" del norte
+del estado.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="analysis/figures/correlations-dark.png">
+  <img alt="Correlaciones: todas negativas salvo el delta de precio industrial 2022→2023, que es +0,27." src="analysis/figures/correlations.png">
+</picture>
+
+La única señal positiva aparece donde cabría esperarla: el **cambio** de precio
+industrial 2022→2023 (r = +0,27). Los niveles de precio reflejan la estructura
+histórica de cada estado; el delta se acerca más a medir presión reciente de
+demanda. Con n = 44 y |r| < 0,35, nada de esto es concluyente — y decirlo forma
+parte del análisis.
+
+> Reproducir las figuras: `python analysis/plot_impact.py` (requiere BigQuery).
+> La estadística está testeada aparte, en `tests/test_plot_impact.py`.
+
 ## Arquitectura
 
 ```
@@ -53,7 +94,10 @@ cruzando dos fuentes que no hablan el mismo idioma (granos, años y cobertura di
               │             mart_datacenter_price_impact      │
               └─────────────────────┬───────────────────────┘
                                     ▼
-                              análisis / BI
+                          ┌───────────────────┐
+                          │ analysis/         │   figuras del README
+                          │ plot_impact.py    │   (matplotlib, claro + oscuro)
+                          └───────────────────┘
 
   Todo el grafo lo orquesta Apache Airflow:
   [extract_eia, extract_epri] → upload_gcs → load_bigquery → dbt run → dbt test
@@ -101,7 +145,7 @@ y las decisiones están documentadas:
 
 Dos niveles de test, uno por cada tipo de código del pipeline.
 
-**Python (`pytest`)** — 70 tests sobre la lógica de extracción, en `tests/`:
+**Python (`pytest`)** — 86 tests sobre la lógica de extracción y análisis, en `tests/`:
 
 - **`test_extract_epri.py`**
   - `STATE_TO_ID`: el mapa estado→código es correcto, cubre los 50 estados y
@@ -116,6 +160,13 @@ Dos niveles de test, uno por cada tipo de código del pipeline.
   - `fetch_all_pages`: paginación — concatena páginas, avanza el `offset` y
     **corta exactamente al alcanzar el `total`** (incluido el caso borde
     off-by-one).
+- **`test_plot_impact.py`**
+  - `pearson`: correlación perfecta ±1, invariancia a escala y desplazamiento,
+    un valor conocido a mano, y los casos que **deben fallar** (series de
+    distinta longitud, o una constante — cuya correlación no es 0, es
+    indefinida; devolver 0 sería mentir en el gráfico).
+  - `correlations` / `top_states`: cobertura de los seis indicadores, el signo
+    del hallazgo y que ordenar no mute la lista de entrada.
 
 El código se hizo testeable separando la **lógica pura del I/O**:
 `row_to_records` y `fetch_all_pages` no tocan disco ni red, así que se prueban
@@ -146,7 +197,7 @@ demuestra que el repo es reproducible, no solo que los tests pasan:
 | Job | Comando | Qué valida |
 |-----|---------|------------|
 | **lint** | `ruff check` | errores reales (imports sin usar, nombres indefinidos) y estilo |
-| **test** | `pytest` | los 70 tests Python — sin red ni credenciales, la API está mockeada |
+| **test** | `pytest` | los 86 tests Python — sin red ni credenciales, la API está mockeada |
 | **dbt** | `dbt parse --warn-error` | refs, sources, YAML y tests del proyecto dbt, **sin conectar** al warehouse |
 
 `dbt parse` en vez de `dbt run` a propósito: compilar el manifest no necesita
@@ -206,13 +257,15 @@ python scripts/extract_epri.py    # xlsx    → data/raw/epri/*.ndjson
 python scripts/upload_gcs.py      # raw     → GCS
 python scripts/load_bigquery.py   # GCS     → BigQuery (raw)
 cd datacenter_impact && dbt run && dbt test
+cd .. && python analysis/plot_impact.py   # mart → figuras del README
 ```
 
 ## Estructura del repo
 
 ```
 scripts/            extracción y carga (EIA, EPRI, GCS, BigQuery)
-tests/              tests pytest de los scripts de extracción
+analysis/           capa de visualización: mart → figuras del README
+tests/              tests pytest de extracción y análisis
 datacenter_impact/  proyecto dbt (staging + marts + tests)
 airflow/            Dockerfile, docker-compose y DAG de orquestación
 ci/                 perfil de dbt sin credenciales, para validar en CI
@@ -232,6 +285,8 @@ docs/               notas de diseño y log de troubleshooting
   separación lógica/I/O) además de los tests declarativos de dbt.
 - **CI** en GitHub Actions: lint, tests y validación del proyecto dbt en cada push,
   sobre un entorno reconstruido desde cero.
+- **Comunicación del resultado**: figuras reproducibles desde la mart, con el hallazgo
+  contraintuitivo explicado (causalidad inversa) en vez de escondido.
 - Código de producción, no de notebook: `logging`, type hints, `TypedDict` como
   contrato de esquema, configuración centralizada y errores manejados explícitamente.
 
